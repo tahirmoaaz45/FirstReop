@@ -1,0 +1,458 @@
+import numpy as np
+from scipy.optimize import least_squares
+initial_m = int(input('initial tune sugestion (ideal, start from 9)： '))
+initial_Accuracy = float(input('accuracy (ideal 0.3)： '))
+end_deformation_1 = float(input('first goal (ideal 0.6)： '))
+end_deformation_2 = float(input('second goal (ideal 0.25)： '))
+def opt_pressure(m,error_list,end_deformation):
+    a2 = []
+    a1 = []
+    for i in range(18):
+        a2.append(error_list[i])
+        a1.append(error_list[i])
+    def heuristic(m):
+        
+        a1.sort(reverse=True)
+        b = a1
+        c = [0]*18
+        d = [0]*18
+        e = [0]*18
+        #print(b)
+        for k in range(18):
+            a = -1
+            for i in range(18):
+                if a2[i] == b[k]:
+                    c[i] = k - a
+                    a += 1
+        #print('1',c)
+        
+        for j in range(18):
+            if c[j] <= m:
+                d[j] = 1
+            else:
+                d[j] = 0
+        #print('2',d)
+                
+        
+        for n in range(18):
+            x = n+1            
+            for j in range(18):
+                y = j+1
+                if c[j] == x:
+                    e[n] = y
+        #print('3',e)
+        
+        f = d
+        
+        for b in range(16):
+            if f[b] == 1 and f[b+1] == 1 and f[b+2] == 1:
+                f[b+1] = 0
+        
+        #print('4',f)
+        
+        
+        g = f
+        
+        for n in range(17):
+            if g[n] ==1 and g[n+1]==1:
+                if c[n] > c[n+1]:
+                    g[n] = 0
+                elif c[n] < c[n+1]:
+                    g[n+1] = 0
+        
+        #print('5',g)
+        
+        h = g
+        d = m - sum(g)
+        #print(d)
+        
+        for n in range(18):
+        
+            if g[e[n]-1] ==1:
+                h[e[n]-1] = g[e[n]-1]
+            elif e[n] ==1:
+                if h[e[n]-1] == 0 and h[e[n]]==0:
+                    h[e[n]-1] =1
+                    d = d-1
+            elif e[n] == 18:
+                if h[e[n]-1] == 0 and h[e[n]-2] == 0:
+                    h[e[n]-1] = 1
+                    d = d -1
+            elif e[n]<18 and e[n] >1:
+                if h[e[n]-1] == 0 and h[e[n]-2] ==0 and h[e[n]] == 0:
+                    h[e[n]-1] = 1
+                    d = d -1
+            if d ==0:
+                break
+        #print('test01',h)
+        #print(d)
+        f = 0
+        
+        while d>0:
+            if  h[e[f]-1] == 0:
+                h[e[f]-1] = 1
+                f = f+1
+                d = d-1
+            else:
+                f = f+1
+
+        #print('test',h)
+        #print('f',f)
+        return h   
+    #make dictionary
+    dic_1 = {}   
+    #heuristic
+    he = heuristic(m)
+    #he = [1,0,1,0,1,0,0,1,0,1,1,1,0,0,1,0,0,1]
+    # print('---heuristic---')
+    # print(he)         
+    #goal = 0.5
+    #error list and each equal fpr function
+    #error_list = (0.896,1.076,1.316,1.764,1.984,1.988,1.984,1.988,1.992,1.988,1.984,1.988,1.936,1.796,1.616,1.384,1.072,1.744)
+    #error_list = (1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)
+    const_list2 = []
+    up_list = []
+    matrix_lb = np.array([he[0],he[1],he[2],he[3],he[4],he[5],he[6],he[7],he[8],he[9],he[10],he[11],he[12],he[13],he[14],he[15],he[16],he[17]])
+    const = np.array([[ 2.1295,	- 2.4028,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0],
+                     [ - 0.7363,	0.2469 ,	0.4973,	- 0.0112 ,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0],
+                     [- 1.4386,	- 0.5924,	1.0045,	0.3084,	- 0.1692,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0],
+                     [- 0.4136,	- 0.437,	1.6874,	- 0.1237,	- 0.1237,	- 0.1953,	- 0.1444,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0],
+                     [- 0.165,	- 0.3809,	0.425,	2.1758,	0.5279,	- 0.1909,	- 0.157,	- 0.1087,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0],
+                     [0,	0.1374,	0.3417,	1.6747,	2.6795,	0.6213,	- 0.1449,	- 0.1076,	- 0.0671,	0,	0,	0,	0,	0,	0,	0,	0,	0],
+                     [0,	0,	0,	0.4924,	2.5466,	2.402,	 0.2139,	- 0.1615,	- 0.0958,	- 0.058,	- 0.0342,	0,	0,	0,	0,	0,	0,	0],
+                     [0,	0,	0,	0,	0.192,	 1.7561,	1.4714,	0.0014,	- 0.113,	- 0.0771,	- 0.0489,	- 0.0313,	0,	0,	0,	0,	0,	0],
+                     [0,	0,	0,	0,	0,	1.4314,	2.1289,	2.1436,	0.2379,	0.076,	0.0343,	0.0132,	0.0034,	0,	0,	0,	0,	0],
+                     [0,	0,	0,	0,	0,	0,	0,	2.0362,	0.4372,	 - 0.1071,	- 0.0804,	 - 0.058,	 - 0.0405,	- 0.0297,	0,	0,	0,	0],
+                     [0,	0,	0,	0,	0,	0,	0,	0,	1.6971,	0.2172,	- 0.0882,	- 0.0763,	- 0.0558,	- 0.0408,	- 0.4408,	0,	0,	0],
+                     [0,	0,	0,	0,	0,	0,	0,	 0,	0,	0.7976,	0.0987,	0.0119,	0.0107,	 0.0087,	0.3334,	- 0.0475,	0,	0],
+                     [0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1.4266,	0.5682,	0.4133,	0.3228,	1.238,	0.4342,	0.0353,	0],
+                     [0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	 0,	0.5088,	- 0.1252,	- 0.101,	1.805,1.2261,	0.6295,	0.4911],
+                     [0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0.3472,	- 0.0727,	0.5137,	 0.319,	0.2499,	0.2186],
+                     [0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1.152,	1.7017,	3.8749,	4.0329,	2.9465],
+                     [0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1.67,	3.3168,	3.562],
+                     [0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	0,	1.4008,	3.7578]])
+
+    const_list2 = np.zeros(18)
+
+    for i in range(18):
+        if matrix_lb[i] == 0:
+            const_list2 = const_list2 + const[:,i]
+
+    for i in range(18):
+        if he[i] == 0:
+            up_list.append(0.0000001)
+        if he[i] == 1:
+            up_list.append(1)
+    error_list2 = [] #error_list offset from end position    
+    for i in range(18):
+        error_list2.append(error_list[i]- end_deformation  )
+    y1_equal = error_list2[0]
+    y1_equal = error_list2[0]
+    y2_equal = error_list2[1]
+    y3_equal = error_list2[2]
+    y4_equal = error_list2[3]
+    y5_equal = error_list2[4]
+    y6_equal = error_list2[5]
+    y7_equal = error_list2[6]
+    y8_equal = error_list2[7]
+    y9_equal = error_list2[8]
+    y10_equal = error_list2[9]
+    y11_equal = error_list2[10]
+    y12_equal = error_list2[11]
+    y13_equal = error_list2[12]
+    y14_equal = error_list2[13]
+    y15_equal = error_list2[14]
+    y16_equal = error_list2[15]
+    y17_equal = error_list2[16]
+    y18_equal = error_list2[17]
+
+    def myFunction(z):
+       A = z[0]*he[0]
+       B = z[1]*he[1]
+       C = z[2]*he[2]
+       D = z[3]*he[3]
+       E = z[4]*he[4]
+       F = z[5]*he[5]
+       G = z[6]*he[6]
+       H = z[7]*he[7]
+       I = z[8]*he[8]
+       J = z[9]*he[9]
+       K = z[10]*he[10]
+       L = z[11]*he[11]
+       M = z[12]*he[12]
+       N = z[13]*he[13]
+       O = z[14]*he[14]
+       P = z[15]*he[15]
+       Q = z[16]*he[16]
+       R = z[17]*he[17]
+
+       Fun = np.empty((18))
+       Fun[0] = 0.0587 * A ** 2 - 1.128 * A - 0.624 - 0.2343 * B ** 2 + 0.7512 * B - 0.1975 * C ** 2 + 1.0181 * C - 0.0491 * D ** 2 + 0.3057 * D - 0.019 * E ** 2 + 0.1497 * E - y1_equal - \
+                const_list2[0]
+       Fun[1] = -0.3124 * A ** 2 + 1.691 * A - 3.4288 - 0.1707 * B ** 2 + 0.1351 * B - 0.2947 * C ** 2 + 0.8043 * C - 0.1432 * D ** 2 + 0.4686 * D - 0.0744 * E ** 2 + 0.338 * E + 0.0029 * F ** 2 - 0.023 * F - y2_equal - \
+                const_list2[1]
+       Fun[2] = -0.0033 * B ** 2 - 0.2412 * B + 3.9559 - 0.1172 * C ** 2 - 0.3234 * C - 0.1432 * D ** 2 - 0.5821 * D - 0.1511 * E ** 2 + 0.0276 * E - 0.0171 * F ** 2 - 0.0754 * F - y3_equal - \
+                const_list2[2]
+       Fun[3] = 0.0034 * B ** 2 + 0.0017 * B + 4.5164 + 0.0016 * C ** 2 - 0.173 * C - 0.0135 * D ** 2 + 0.0606 * D - 0.0754 * E ** 2 - 1.0914 * E - 0.0463 * F ** 2 - 0.7203 * F - 0.0118 * G ** 2 - 0.1782 * G - y4_equal - \
+                const_list2[3]
+       Fun[4] = -0.0072 * C ** 2 + 0.0929 * C + 5.1252 - 0.0135 * D ** 2 + 0.0606 * D - 0.0111 * E ** 2 - 0.3175 * E + 0.00121417 * F ** 2 - 1.5579 * F - 0.0058 * G ** 2 - 1.3707 * G - 0.074 * H ** 2 - 0.004 * H - y5_equal - \
+                const_list2[4]
+       Fun[5] = -0.0109 * D ** 2 + 0.1153 * D + 5.8246 - 0.0109 * E ** 2 + 0.0999 * E + 0.0019 * F ** 2 - 0.4236 * F + 0.0168 * G ** 2 - 1.4798 * G - 0.0756 * H ** 2 - 1.0827 * H + 0.0062 * I ** 2 - 0.7636 * I - y6_equal - \
+                const_list2[5]
+       Fun[6] = -0.0092 * D ** 2 + 0.0938 * D + 3.3679 - 0.009 * E ** 2 + 0.1005 * E - 0.006 * F ** 2 + 0.0656 * F - 0.01 * G ** 2 - 0.1829 * G - 0.0188 * H ** 2 - 1.0013 * H - 0.0518 * I ** 2 - 1.3471 * I - y7_equal - \
+                const_list2[6]
+       Fun[7] = -0.0073 * E ** 2 + 0.0772 * E + 3.8034 - 0.0057 * F ** 2 + 0.0747 * F - 0.0067 * G ** 2 + 0.0809 * G - 0.016 * H ** 2 - 0.032 * H + 0.0787 * I ** 2 - 1.4282 * I - 0.04869 * J ** 2 - 1.43 * J - y8_equal - \
+                const_list2[7]
+       Fun[8] = -0.0052 * F ** 2 + 0.0578 * F + 2.0963 - 0.0056 * G ** 2 + 0.0717 * G - 0.0064 * H ** 2 + 0.0765 * H + 0.0239 * I ** 2 - 0.1841 * I - 0.0215 * J ** 2 - 0.3247 * J - 0.0411 * K ** 2 - 1.1926 * K - y9_equal - \
+                const_list2[8]
+       Fun[9] = -0.0045 * G ** 2 + 0.0519 * G + 0.8486 - 0.0058 * H ** 2 + 0.0677 * H + 0.0125 * I ** 2 - 0.0446 * I - 0.0073 * J ** 2 + 0.0576 * J - 0.0189 * K ** 2 - 0.161 * K - 0.0243 * L ** 2 - 1.1202 * L - y10_equal - \
+                const_list2[9]
+       Fun[10] = -0.0034 * G ** 2 + 0.0345 * G + 1.3079 - 0.0046 * H ** 2 + 0.0488 * H + 0.0052 * I ** 2 - 0.0053 * I - 0.0056 * J ** 2 + 0.0689 * J - 0.0051 * K ** 2 + 0.0568 * K - 0.0094 * L ** 2 - 0.1205 * L - 0.017 * M ** 2 - 0.9212 * M - y11_equal - \
+                 const_list2[10]
+       Fun[11] = -0.0035 * H ** 2 + 0.0333 * H + 0.9365 + 0.0014 * I ** 2 + 0.0078 * I - 0.0053 * J ** 2 + 0.0583 * J - 0.0056 * K ** 2 + 0.0696 * K - 0.0005 * L ** 2 + 0.0239 * L - 0.0028 * M ** 2 - 0.0814 * M - 0.0537 * N ** 2 - 0.3359 * N - y12_equal - \
+                 const_list2[11]
+       Fun[12] = -0.0003 * I ** 2 + 0.0105 * I + 0.5531 - 0.0046 * J ** 2 + 0.0434 * J - 0.0052 * K ** 2 + 0.0567 * K - 0.0024 * L ** 2 + 0.0382 * L + 0.0021 * M ** 2 - 0.0016 * M - 0.0158 * N ** 2 + 0.0671 * N - 0.0435 * O ** 2 - 0.1854 * O - y13_equal - \
+                 const_list2[12]
+       Fun[13] = -0.0039 * J ** 2 + 0.0322 * J + 1.2393 - 0.0045 * K ** 2 + 0.043 * K - 0.0029 * L ** 2 + 0.0332 * L + 0.0003 * M ** 2 + 0.0109 * M - 0.0066 * N ** 2 + 0.0749 * N - 0.0042 * O ** 2 + 0.0191 * O - 0.011 * P ** 2 - 0.3716 * P - y14_equal - \
+                 const_list2[13]
+       Fun[14] = -0.0269 * K ** 2 + 0.2451 * K + 5.151 + 0.0153 * L ** 2 - 0.2114 * L + 0.0083 * M ** 2 - 0.8448 * M - 0.0953 * N ** 2 - 1.2821 * N + 0.0103 * O ** 2 - 0.1447 * O + 0.0309 * P ** 2 - 0.6139 * P - y15_equal - \
+                 const_list2[14]
+       Fun[15] = 0.001 * L ** 2 + 0.0253 * L + 7.4767 - 0.0034 * M ** 2 - 0.046 * M - 0.0194 * N ** 2 - 0.5722 * N + 0.0024 * O ** 2 - 0.0089 * O + 0.0748 * P ** 2 - 2.1887 * P + 0.0134 * Q ** 2 - 0.6052 * Q - y16_equal - \
+                 const_list2[15]
+       Fun[16] = -0.0198 * M ** 2 + 0.1814 * M + 9.6652 - 0.0013 * N ** 2 - 0.079 * N - 0.0002 * O ** 2 + 0.0107 * O + 0.0397 * P ** 2 - 2.3442 * P + 0.023 * Q ** 2 - 1.7924 * Q - 0.0318 * R ** 2 - 0.3751 * R - y17_equal - \
+                 const_list2[16]
+       Fun[17] = 0.0031 * N ** 2 - 0.0055 * N + 10.976 - 0.0003 * O ** 2 + 0.0056 * O + 0.0263 * P ** 2 - 1.3889 * P + 0.0371 * Q ** 2 - 4.1248 * Q - y18_equal - \
+                 const_list2[17]
+
+       return Fun
+    # lb = []
+    # for i in range(18):
+    #     lb.append(0)
+    lb = np.array([1.5*he[0],1.5*he[1],1.5*he[2],1.5*he[3],1.5*he[4],1.5*he[5],1.5*he[6],1.5*he[7],1.5*he[8],1.5*he[9],1.5*he[10],1.5*he[11],1.5*he[12],1.5*he[13],1.5*he[14],1.5*he[15],1.5*he[16],1.5*he[17]])
+    
+    ub = np.array([5*up_list[0],5*up_list[1],5*up_list[2],5*up_list[3],5*up_list[4],5*up_list[5],5*up_list[6],5*up_list[7],5*up_list[8],5*up_list[9],5*up_list[10],5*up_list[11],5*up_list[12],5*up_list[13],5*up_list[14],5*up_list[15],5*up_list[16],5*up_list[17]])
+    #print(lb)
+    #zGuess = np.array([5*he[0],5*he[1],5*he[2],5*he[3],5*he[4],5*he[5],5*he[6],5*he[7],5*he[8],1.5*he[9],5*he[10],5*he[11],5*he[12],5*he[13],5*he[14],5*he[15],5*he[16],5*he[17]])
+    zGuess = np.array([5*he[0],5*he[1],5*he[2],5*he[3],5*he[4],5*he[5],5*he[6],5*he[7],5*he[8],1.5*he[9],5*he[10],5*he[11],5*he[12],5*he[13],5*he[14],5*he[15],5*he[16],5*he[17]])
+
+    z = least_squares(myFunction,zGuess, bounds=(lb, ub))
+    #print(z)
+    #print('--------test---------')
+    pressure_list = z['x']
+    #print(pressure_list)
+
+    A = pressure_list[0]*he[0]
+    B = pressure_list[1]*he[1]
+    C = pressure_list[2]*he[2]
+    D = pressure_list[3]*he[3]
+    E = pressure_list[4]*he[4]
+    F = pressure_list[5]*he[5]
+    G = pressure_list[6]*he[6]
+    H = pressure_list[7]*he[7]
+    I = pressure_list[8]*he[8]
+    J = pressure_list[9]*he[9]
+    K = pressure_list[10]*he[10]
+    L = pressure_list[11]*he[11]
+    M = pressure_list[12]*he[12]
+    N = pressure_list[13]*he[13]
+    O = pressure_list[14]*he[14]
+    P = pressure_list[15]*he[15]
+    Q = pressure_list[16]*he[16]
+    R = pressure_list[17]*he[17]
+
+    y1_fn = 0.0587 * A ** 2 - 1.128 * A - 0.624 - 0.2343 * B ** 2 + 0.7512 * B - 0.1975 * C ** 2 + 1.0181 * C - 0.0491 * D ** 2 + 0.3057 * D - 0.019 * E ** 2 + 0.1497 * E - y1_equal - \
+            const_list2[0]
+
+    y2_fn = -0.3124 * A ** 2 + 1.691 * A - 3.4288 - 0.1707 * B ** 2 + 0.1351 * B - 0.2947 * C ** 2 + 0.8043 * C - 0.1432 * D ** 2 + 0.4686 * D - 0.0744 * E ** 2 + 0.338 * E + 0.0029 * F ** 2 - 0.023 * F - y2_equal - \
+             const_list2[1]
+    y3_fn  = -0.0033 * B ** 2 - 0.2412 * B + 3.9559 - 0.1172 * C ** 2 - 0.3234 * C - 0.1432 * D ** 2 - 0.5821 * D - 0.1511 * E ** 2 + 0.0276 * E - 0.0171 * F ** 2 - 0.0754 * F - y3_equal - \
+             const_list2[2]
+    y4_fn  = 0.0034 * B ** 2 + 0.0017 * B + 4.5164 + 0.0016 * C ** 2 - 0.173 * C - 0.0135 * D ** 2 + 0.0606 * D - 0.0754 * E ** 2 - 1.0914 * E - 0.0463 * F ** 2 - 0.7203 * F - 0.0118 * G ** 2 - 0.1782 * G - y4_equal - \
+             const_list2[3]
+    y5_fn  = -0.0072 * C ** 2 + 0.0929 * C + 5.1252 - 0.0135 * D ** 2 + 0.0606 * D - 0.0111 * E ** 2 - 0.3175 * E + 0.00121417 * F ** 2 - 1.5579 * F - 0.0058 * G ** 2 - 1.3707 * G - 0.074 * H ** 2 - 0.004 * H - y5_equal - \
+             const_list2[4]
+    y6_fn = -0.0109 * D ** 2 + 0.1153 * D + 5.8246 - 0.0109 * E ** 2 + 0.0999 * E + 0.0019 * F ** 2 - 0.4236 * F + 0.0168 * G ** 2 - 1.4798 * G - 0.0756 * H ** 2 - 1.0827 * H + 0.0062 * I ** 2 - 0.7636 * I - y6_equal - \
+             const_list2[5]
+    y7_fn  = -0.0092 * D ** 2 + 0.0938 * D + 3.3679 - 0.009 * E ** 2 + 0.1005 * E - 0.006 * F ** 2 + 0.0656 * F - 0.01 * G ** 2 - 0.1829 * G - 0.0188 * H ** 2 - 1.0013 * H - 0.0518 * I ** 2 - 1.3471 * I - y7_equal - \
+             const_list2[6]
+    y8_fn = -0.0073 * E ** 2 + 0.0772 * E + 3.8034 - 0.0057 * F ** 2 + 0.0747 * F - 0.0067 * G ** 2 + 0.0809 * G - 0.016 * H ** 2 - 0.032 * H + 0.0787 * I ** 2 - 1.4282 * I - 0.04869 * J ** 2 - 1.43 * J - y8_equal - \
+             const_list2[7]
+    y9_fn  = -0.0052 * F ** 2 + 0.0578 * F + 2.0963 - 0.0056 * G ** 2 + 0.0717 * G - 0.0064 * H ** 2 + 0.0765 * H + 0.0239 * I ** 2 - 0.1841 * I - 0.0215 * J ** 2 - 0.3247 * J - 0.0411 * K ** 2 - 1.1926 * K - y9_equal - \
+             const_list2[8]
+    y10_fn  = -0.0045 * G ** 2 + 0.0519 * G + 0.8486 - 0.0058 * H ** 2 + 0.0677 * H + 0.0125 * I ** 2 - 0.0446 * I - 0.0073 * J ** 2 + 0.0576 * J - 0.0189 * K ** 2 - 0.161 * K - 0.0243 * L ** 2 - 1.1202 * L - y10_equal - \
+             const_list2[9]
+    y11_fn  = -0.0034 * G ** 2 + 0.0345 * G + 1.3079 - 0.0046 * H ** 2 + 0.0488 * H + 0.0052 * I ** 2 - 0.0053 * I - 0.0056 * J ** 2 + 0.0689 * J - 0.0051 * K ** 2 + 0.0568 * K - 0.0094 * L ** 2 - 0.1205 * L - 0.017 * M ** 2 - 0.9212 * M - y11_equal - \
+              const_list2[10]
+    y12_fn  = -0.0035 * H ** 2 + 0.0333 * H + 0.9365 + 0.0014 * I ** 2 + 0.0078 * I - 0.0053 * J ** 2 + 0.0583 * J - 0.0056 * K ** 2 + 0.0696 * K - 0.0005 * L ** 2 + 0.0239 * L - 0.0028 * M ** 2 - 0.0814 * M - 0.0537 * N ** 2 - 0.3359 * N - y12_equal - \
+              const_list2[11]
+    y13_fn  = -0.0003 * I ** 2 + 0.0105 * I + 0.5531 - 0.0046 * J ** 2 + 0.0434 * J - 0.0052 * K ** 2 + 0.0567 * K - 0.0024 * L ** 2 + 0.0382 * L + 0.0021 * M ** 2 - 0.0016 * M - 0.0158 * N ** 2 + 0.0671 * N - 0.0435 * O ** 2 - 0.1854 * O - y13_equal - \
+              const_list2[12]
+    y14_fn  = -0.0039 * J ** 2 + 0.0322 * J + 1.2393 - 0.0045 * K ** 2 + 0.043 * K - 0.0029 * L ** 2 + 0.0332 * L + 0.0003 * M ** 2 + 0.0109 * M - 0.0066 * N ** 2 + 0.0749 * N - 0.0042 * O ** 2 + 0.0191 * O - 0.011 * P ** 2 - 0.3716 * P - y14_equal - \
+              const_list2[13]
+    y15_fn  = -0.0269 * K ** 2 + 0.2451 * K + 5.151 + 0.0153 * L ** 2 - 0.2114 * L + 0.0083 * M ** 2 - 0.8448 * M - 0.0953 * N ** 2 - 1.2821 * N + 0.0103 * O ** 2 - 0.1447 * O + 0.0309 * P ** 2 - 0.6139 * P - y15_equal - \
+              const_list2[14]
+    y16_fn = 0.001 * L ** 2 + 0.0253 * L + 7.4767 - 0.0034 * M ** 2 - 0.046 * M - 0.0194 * N ** 2 - 0.5722 * N + 0.0024 * O ** 2 - 0.0089 * O + 0.0748 * P ** 2 - 2.1887 * P + 0.0134 * Q ** 2 - 0.6052 * Q - y16_equal - \
+              const_list2[15]
+    y17_fn  = -0.0198 * M ** 2 + 0.1814 * M + 9.6652 - 0.0013 * N ** 2 - 0.079 * N - 0.0002 * O ** 2 + 0.0107 * O + 0.0397 * P ** 2 - 2.3442 * P + 0.023 * Q ** 2 - 1.7924 * Q - 0.0318 * R ** 2 - 0.3751 * R - y17_equal - \
+              const_list2[16]
+    y18_fn  = 0.0031 * N ** 2 - 0.0055 * N + 10.976 - 0.0003 * O ** 2 + 0.0056 * O + 0.0263 * P ** 2 - 1.3889 * P + 0.0371 * Q ** 2 - 4.1248 * Q - y18_equal - \
+              const_list2[17]
+
+    # print('each eual:')
+    # print(y1_equal,y2_equal,y3_equal,y4_equal,y5_equal,y6_equal,y7_equal,y8_equal,y9_equal,y10_equal,y11_equal,y12_equal,y13_equal,y14_equal,y15_equal,y16_equal,y17_equal,y18_equal)
+    # print('real ouput deformation:')
+    # print(y1_fn,y2_fn,y3_fn,y4_fn,y5_fn,y6_fn,y7_fn,y8_fn,y9_fn,y10_fn,y11_fn,y12_fn,y13_fn,y14_fn,y15_fn,y16_fn,y17_fn,y18_fn)
+    # print('const list2:')
+    # print(const_list2)
+    #print('heuristic')
+    #print(he)
+    #print('down')
+    pressure_list = (A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R)
+    #print(pressure_list)
+    deformation_list = (y1_fn,y2_fn,y3_fn,y4_fn,y5_fn,y6_fn,y7_fn,y8_fn,y9_fn,y10_fn,y11_fn,y12_fn,y13_fn,y14_fn,y15_fn,y16_fn,y17_fn,y18_fn)
+    dic_1 = {'how many points:': m,
+             'real ouput deformation: ':deformation_list,
+             'pressure on each points: ':pressure_list,
+             'error list2: ':error_list2,
+             'const_list2'  :const_list2
+             }  
+    
+    return dic_1
+error_list3=[]
+#error_list = (1.068,1.104,1.28,1.408,1.52,1.636,1.656,1.532,1.236,0.896,0.7,0.604,0.628,0.776,0.96,0.996,0.892,0.836)
+error_list = (0.828,0.744,1.044,1.16,1.256,1.476,1.66,1.584,1.572,1.612,1.684,1.808,1.3968,2.832,2.828,2.828,2.852,2.844)
+#error_list = (0.49809771375494216, 0.5150191368890814, 0.4128530154900959, 0.6225452910499032, 0.4896572423457908, 0.447028790347745, 0.4937944065067088, 0.5338533753566974, 0.5183234992276502, 0.46957349068306264, 0.47414036876551213, 0.539877646826668, 0.49960872369051756, 0.5169638954699758, 0.411794702944813, 0.5651734354372244, 0.5610545125941633, 0.48282611634862493)
+#error_list = (1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1)
+#error_list = (0.35405557495560314, 0.42038195292852987, 0.46573716604858617, 0.49595015263734454, 0.5419949227430687, 0.5737915356368868, 0.40080432625766704, 0.4846594597482904, 0.5561641986523127, 0.5561641986523127, 0.5033585289413296, 0.4626277154204922, 0.590943191546089, 0.45168481932732785, 0.5185255098347932, 0.514116463393608, 0.48067656452583374, 0.503209689592993)
+#const_list = [0.6994,    0.6783 ,   0.5435  ,  0.3154  ,  0.2060  ,  0.2023  ,  0.0748  ,  0.1044 ,  -0.0243  ,  0.0296  , -0.0627 ,  -0.0176   , 0.0283 ,  -0.0762  ,  0.0162  ,  0.0612  ,  0.1367, 0.26519]
+Accuracy = initial_Accuracy
+m = initial_m
+
+check1 = True
+while check1:
+
+    count = 0
+    z = opt_pressure(m, error_list, end_deformation_1)
+    error_list2 = z['error list2: ']
+    real_ouputlist = z['real ouput deformation: ']
+    # print('---how mant points---')
+    # print(m)
+    # print('---position now---')
+    q = 0
+    error_list3 = []
+    position_now = []
+    for i in range(18):
+        position_now.append(error_list[i]-real_ouputlist[i])
+    for i in range(18):
+        error_list3.append(position_now[i] - end_deformation_1) 
+    #print(error_list3)
+    for i in range(18):
+        if error_list3[i] <=initial_Accuracy:
+            q +=1
+    if q == 18: 
+        print('-------------first time fianl data----------------')
+        print('---error list---')
+        print(error_list)
+        pressure = z['pressure on each points: ']
+        print('---pressure on each point---')
+        print(pressure)
+        print('----each point should deformation----')
+        print(error_list2)
+        print('---real deformation: ---')
+        print(real_ouputlist)
+        print('---min number points should use---')
+        print(m)
+        print('----Accuracy----')
+        print(Accuracy)
+        print('----position now----')
+        print(position_now)
+        check1 = False
+    else:
+        m +=1
+    if m == 19:
+        print('-------------first time fianl data----------------')
+        print('---error list---')
+        print(error_list)
+        pressure = z['pressure on each points: ']
+        print('---pressure on each point---')
+        print(pressure)
+        print('----each point should deformation----')
+        print(error_list2)
+        print('---real deformation: ---')
+        print(real_ouputlist)
+        print('---min number points should use---')
+        print(m)
+        print('----Accuracy----')
+        print(Accuracy)
+        print('----position now----')
+        print(position_now)
+        check1 = False
+
+m = initial_m
+error_list = position_now
+
+check2 = True
+while check2:
+
+    count = 0
+    z = opt_pressure(m, error_list, end_deformation_2)
+    error_list2 = z['error list2: ']
+    real_ouputlist = z['real ouput deformation: ']
+    # print('---how mant points---')
+    # print(m)
+    # print('---position now---')
+    q = 0
+    error_list3 = []
+    position_now = []
+    for i in range(18):
+        position_now.append(error_list[i]-real_ouputlist[i])
+    for i in range(18):
+        error_list3.append(position_now[i] - end_deformation_2) 
+    #print(error_list3)
+    for i in range(18):
+        if error_list3[i] <=initial_Accuracy:
+            q +=1
+    if q == 18: 
+        print('-------------second times fianl data----------------')
+        print('---error list---')
+        print(error_list)
+        pressure = z['pressure on each points: ']
+        print('---pressure on each point---')
+        print(pressure)
+        print('----each point should deformation----')
+        print(error_list2)
+        print('---real deformation: ---')
+        print(real_ouputlist)
+        print('---min number points should use---')
+        print(m)
+        print('----Accuracy----')
+        print(Accuracy)
+        print('----position now----')
+        print(position_now)
+        check2 = False
+    else:
+        m +=1
+    if m == 19:
+        print('-------------first time fianl data----------------')
+        print('---error list---')
+        print(error_list)
+        pressure = z['pressure on each points: ']
+        print('---pressure on each point---')
+        print(pressure)
+        print('----each point should deformation----')
+        print(error_list2)
+        print('---real deformation: ---')
+        print(real_ouputlist)
+        print('---min number points should use---')
+        print(m)
+        print('----Accuracy----')
+        print(Accuracy)
+        print('----position now----')
+        print(position_now)
+        check1 = False
+
+
+
+
+
+
